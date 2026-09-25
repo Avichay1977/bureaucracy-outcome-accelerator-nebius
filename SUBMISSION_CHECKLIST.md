@@ -12,8 +12,8 @@
 - [ ] Create/obtain Nebius Token Factory API key.
 - [ ] Verify a real live Nemotron call from Home.
 - [ ] Capture proof of live provider/model in demo.
-- [ ] Create separate public GitHub repository.
-- [ ] Push exact Nebius package and verify clean clone/run instructions.
+- [x] Create separate public GitHub repository.
+- [x] Push exact Nebius package and verify clean clone/run instructions.
 - [ ] Host a public working demo/test build.
 - [ ] Record <3 minute demo without copyrighted music.
 - [ ] Upload demo publicly to YouTube.
