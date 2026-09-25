@@ -29,12 +29,32 @@ python server.py --host 127.0.0.1 --port 8765
 
 Open `http://127.0.0.1:8765/`.
 
+## Public web demo
+Public test build: https://bureaucracy-outcome-accelerator-nebius.netlify.app
+
+The repository also contains a Netlify-compatible test build:
+- static UI: `web/`
+- serverless endpoint: `/api/agent`
+- secret: `NEBIUS_API_KEY` stored as a Netlify environment variable
+- optional model override: `NEBIUS_MODEL`
+
+The public test build carries the current case in the browser request between steps. The **canonical stateful MCP implementation remains the Python server**. The public build is a judge/demo surface, not a replacement architecture.
+
+Verified on 2026-09-25:
+- production deploy state: ready
+- function `agent` deployed at `/api/agent`
+- GET health response works
+- POST case creation works
+- current public build reports `provider_configured=false` until a real Token Factory API key is available
+
+If no Nebius API key is configured, the UI explicitly shows `local heuristic fallback`; it must not be represented as a live Token Factory call.
+
 ## Verify
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-Current local verification: 13 automated tests pass.
+The GitHub Actions workflow runs the same suite on clean Python 3.11 and 3.12 environments.
 
 ## MCP tools
 - `break_bureaucracy` — reason backward from goal to the active blocker and smallest safe action.
