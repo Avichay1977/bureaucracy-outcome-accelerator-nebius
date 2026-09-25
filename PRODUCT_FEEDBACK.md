@@ -1,33 +1,40 @@
-# Product Feedback — Amazon Build, Ship, Shape
+# Product Feedback — Nebius × NVIDIA Global AI Hackathon
 
 ## Developer tools / APIs / SDKs used
-Primary track: **Alexa+**.
+Primary track: **Best Apps & Agents**.
 
-The project uses the hackathon's supported **self-hosted MCP** path rather than gated Alexa+ preview tooling. The server implements MCP protocol version `2025-11-25` over a Streamable HTTP endpoint and is exercised through a local web simulator.
+The competition build uses:
+- **Nebius Token Factory** as the hosted inference endpoint.
+- **NVIDIA Nemotron** (`nvidia/nemotron-3-super-120b-a12b`) as the structured reasoning model.
+- A stateful Python MCP application for case memory, verification, and rerouting.
+- A browser demo for the judge path.
+- A separate Netlify public test build that calls the same Nebius model contract when `NEBIUS_API_KEY` is configured.
 
 ## What worked well
-- The official rules provide a clear alternative path for Alexa+ submissions: a self-hosted MCP server is sufficient and does not require access to preview-only Alexa+ tools.
-- The minimum MCP version and Streamable HTTP requirement are explicit, which made the technical acceptance boundary testable.
-- Allowing a custom web simulator makes it possible to demonstrate the user experience without proprietary hardware or partner-only tooling.
-- The judging criteria explicitly reward stateful, agentic workflows rather than single-turn Q&A, which is a good fit for real workflow products.
+- Token Factory exposes an OpenAI-compatible chat-completions surface, so the model adapter stays small and auditable.
+- The model catalogue makes the NVIDIA model choice explicit instead of hiding provider/model provenance.
+- The hackathon allows existing projects when there is a significant event-period update, which makes it possible to improve a real workflow instead of rebuilding a disposable demo.
+- The Apps & Agents track fits a closed-loop workflow where model reasoning is only one component of a larger state machine.
 
 ## What needs work
-- The distinction between generally available hackathon paths and preview-only Alexa+ developer tooling is easy to miss when moving between documentation pages.
-- Private-repository review requires several individual collaborator invitations, and those invitations expire. This adds avoidable submission administration.
-- The rules are precise about MCP version and transport but do not provide a small official conformance test specifically for hackathon entrants. A judge-facing smoke-test reference would reduce ambiguity.
+- Promotional-credit onboarding currently requires a supported payment card before Token Factory API access can be activated. For a hackathon that advertises promotional access, a clearly documented cardless event path would reduce friction.
+- The distinction between hackathon registration, AI Builder review, billing onboarding, promotional credit redemption, and Token Factory API activation is spread across multiple surfaces.
+- A small official "hackathon readiness" diagnostic that reports account eligibility, promo-credit state, API-key readiness, and model access would prevent repeated setup loops.
 
-## Onboarding experience: zero to hello world
-The shortest successful path was:
-1. Read the Official Rules first rather than assuming preview tooling was required.
-2. Select the self-hosted MCP route.
-3. Implement `initialize`, session handling, `tools/list` and `tools/call` over HTTP.
-4. Add a local simulator.
-5. Add automated tests for version/session/origin behavior.
+## Onboarding experience: zero to live model call
+The shortest path we found is:
+1. Join the hackathon / establish the event account context.
+2. Complete Nebius account onboarding.
+3. Activate billing onboarding.
+4. Redeem the eligible promotional credit.
+5. Create a Token Factory API key.
+6. Call `/v1/chat/completions` with the NVIDIA Nemotron model.
+7. Verify provider/model provenance in the application UI.
 
-The main onboarding friction was discovering that the gated Alexa+ Category SDK / MCP Toolkit / CLI / Web Simulator were not required for the competition path.
+The main friction is that step 3 currently requires a payment card even when the intent is to use promotional hackathon credit.
 
-## Would I build with this approach again?
-**Yes.** A standards-based MCP surface is a good fit for stateful agent tools because the business logic remains portable and testable outside a proprietary client. I would prefer a single hackathon quick-start page that cleanly separates the public self-hosted MCP path from partner-preview tooling.
+## Would I build with Token Factory again?
+**Yes, provided onboarding is unblocked.** The inference API is simple enough to isolate behind a narrow adapter, which keeps the rest of the agent architecture portable and testable.
 
-## AWS Builder mini-challenge
-Not claimed in this baseline submission. No AWS runtime integration is represented or implied.
+## Safety / human control
+The model may identify a blocker and propose one smallest safe action. It does not send messages, submit forms, make payments, sign declarations, or impersonate the user. Consequential actions remain behind an explicit human approval gate.
