@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bureaucracy Outcome Accelerator</title><link rel="stylesheet" href="/web/style.css"></head>
+<body><main>
+<div class="eyebrow">Nebius × NVIDIA · Best Apps & Agents</div>
+<h1>Bureaucracy Outcome Accelerator</h1>
+<p class="sub">Turn “I need the bureaucracy solved” into one safe action, then verify whether reality changed.</p>
+<section class="card">
+<label>Citizen goal</label><textarea id="goal">Get the city to add one more waste bin to our residential area.</textarea>
+<label>Known facts</label><textarea id="facts">I spoke with the municipal waste official today. He agreed to add one bin.</textarea>
+<button id="run">Run the agent</button>
+</section>
+<section id="result" class="card hidden"></section>
+<section id="follow" class="card hidden"><h2>Outcome check</h2><p>Agreement is not the outcome. What happened in the real world?</p>
+<input id="outcome" value="The official agreed, but the bin has not been placed yet."><div class="row"><button id="notVerified">Not verified — reroute</button><button id="verified">Verified outcome</button></div></section>
+<footer>Goal → Bottleneck → Controller → Smallest Safe Action → Verify → Re-route</footer>
+</main><script src="/web/app.js"></script></body></html>
