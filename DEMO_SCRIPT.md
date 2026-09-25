@@ -1,50 +1,85 @@
 # Demo Script — target 2:20
 
-## 0:00–0:15 — The problem
-“Bureaucracy does not usually fail because people lack information. It fails because nobody owns the outcome.”
+Hard rule: record the final competition video only after the live demo visibly reports:
+**Nebius Token Factory · nvidia/nemotron-3-super-120b-a12b**
 
-“People get instructions. They make calls. They receive promises. And still nothing changes.”
+No copyrighted music. Keep the browser URL visible briefly so judges can connect the video to the public test build.
 
-## 0:15–0:28 — The product
-“Bureaucracy Outcome Accelerator does one thing: it finds the blocker that matters now.”
+## 0:00–0:12 — Problem
+“Bureaucracy usually does not fail because people lack information. It fails because nobody owns the outcome.”
 
-“Then it gives one next move — and one proof that tells us whether it actually worked.”
+“People get instructions, make calls, receive promises — and still nothing changes.”
 
+## 0:12–0:25 — Product
+“Bureaucracy Outcome Accelerator finds the blocker that matters now.”
+
+“Then it gives one next move and one proof that tells us whether it actually worked.”
+
+On screen:
 **One blocker. One next move. One proof.**
 
-## 0:28–1:15 — Live case
-Show the pre-filled municipal waste-bin case.
+## 0:25–0:58 — Live model call
+Show:
+https://bureaucracy-outcome-accelerator-nebius.netlify.app
 
-Click **Ask the agent**.
+Use the pre-filled municipal waste-bin case.
 
-Point to only four things:
-1. Blocker.
+Click **Run the agent**.
+
+Pause on the provider/model badge:
+**Nebius Token Factory · nvidia/nemotron-3-super-120b-a12b**
+
+Say:
+“NVIDIA Nemotron, served through Nebius Token Factory, reasons over the active dependency.”
+
+Point to:
+1. Current blocker.
 2. Controller.
-3. Smallest safe next move.
-4. Verification evidence.
+3. Smallest safe next action.
+4. Verification rule.
+
+## 0:58–1:25 — False finish line
 Say:
 “The official agreed to add a bin. That sounds like success. It isn’t.”
 
 “Our finish line is not agreement. Our finish line is a bin in the real world.”
 
-## 1:15–1:48 — The moment
+Show the outcome field:
+“The official agreed, but the bin has not been placed yet.”
+
+## 1:25–1:48 — Reroute
 Click **Not verified — reroute**.
 
-Show the state becoming `REROUTE`.
+Show state:
+`REROUTE`
 
-Show that the system asks for the work-order/reference number and exact placement details instead of repeating the original advice.
+Point to the changed next action.
 
 Say:
-“This is the product. It remembers what happened, rejects a false finish line, and changes the route.”
+“This is the closed loop. The system remembers what happened, rejects a false finish line, and changes the route instead of repeating the same advice.”
 
-## 1:48–2:08 — The technology
-Show the provider/model badge.
+## 1:48–2:07 — Architecture
+Briefly show the public GitHub repository.
 
-“NVIDIA Nemotron through Nebius Token Factory reasons over the active dependency. The stateful MCP layer holds memory, verification, rerouting, and the human approval boundary.”
+Say:
+“The model reasons. The application owns state, verification, rerouting, and the human approval boundary.”
 
-“The model reasons. The product owns the process.”
+“We separate probabilistic reasoning from deterministic process state.”
 
-## 2:08–2:20 — Close
-“Bureaucracy does not need another chatbot.”
+## 2:07–2:20 — Close
+“Most bureaucracy software tells you what to do.”
 
-“It needs a finish line.”
+“This system keeps going until there is proof that reality changed.”
+
+“Bureaucracy does not need another chatbot. It needs a finish line.”
+
+## Capture checklist
+- Provider/model badge is readable.
+- Public demo URL is shown.
+- `ACTION_NOW` is shown before outcome recording.
+- `REROUTE` is shown after “Not verified”.
+- GitHub repository is public on screen.
+- No private tabs, notifications, personal data, API keys, or account identifiers are visible.
+- No copyrighted music.
+- Total duration < 3:00.
+- Upload publicly to YouTube.
