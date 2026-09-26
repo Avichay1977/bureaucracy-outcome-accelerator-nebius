@@ -38,7 +38,19 @@ Point to:
 3. Smallest safe next action.
 4. Verification rule.
 
-## 0:58–1:25 — False finish line
+## 0:58–1:12 — Human Gate
+Show state:
+`WAITING_APPROVAL`
+
+Say:
+“The agent may reason about the next action, but it cannot approve its own consequential step.”
+
+Click **Approve & resume**.
+
+Show:
+`AWAITING_VERIFICATION`
+
+## 1:12–1:32 — False finish line
 Say:
 “The official agreed to add a bin. That sounds like success. It isn’t.”
 
@@ -47,16 +59,14 @@ Say:
 Show the outcome field:
 “The official agreed, but the bin has not been placed yet.”
 
-## 1:25–1:48 — Reroute
+## 1:32–1:48 — Safe reroute
 Click **Not verified — reroute**.
 
-Show state:
-`REROUTE`
-
-Point to the changed next action.
+Show the changed next action and the new:
+`WAITING_APPROVAL`
 
 Say:
-“This is the closed loop. The system remembers what happened, rejects a false finish line, and changes the route instead of repeating the same advice.”
+“The system remembers what happened, rejects a false finish line, changes the route, and gates the new action again instead of executing it automatically.”
 
 ## 1:48–2:07 — Architecture
 Briefly show the public GitHub repository.
@@ -76,8 +86,9 @@ Say:
 ## Capture checklist
 - Provider/model badge is readable.
 - Public demo URL is shown.
-- `ACTION_NOW` is shown before outcome recording.
-- `REROUTE` is shown after “Not verified”.
+- `WAITING_APPROVAL` is shown before the first consequential action.
+- `AWAITING_VERIFICATION` is shown only after **Approve & resume**.
+- After “Not verified”, the changed fallback returns to `WAITING_APPROVAL`.
 - GitHub repository is public on screen.
 - No private tabs, notifications, personal data, API keys, or account identifiers are visible.
 - No copyrighted music.
