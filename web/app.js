@@ -35,7 +35,16 @@ function show(c){
     '<div class="k">Who controls it</div><div class="v">'+esc(c.controller)+'</div>'+
     '<div class="k">Smallest safe next action</div><div class="v">'+esc(c.next_action)+'</div>'+
     '<div class="k">Verification rule</div><div class="v">'+esc(c.verify)+'</div>';
-  document.getElementById('follow').classList.remove('hidden');
+  const approval=document.getElementById('approval');
+  const follow=document.getElementById('follow');
+  approval.classList.add('hidden');
+  follow.classList.add('hidden');
+  if(c.status==='WAITING_APPROVAL'){
+    approval.classList.remove('hidden');
+  }
+  if(c.status==='AWAITING_VERIFICATION'){
+    follow.classList.remove('hidden');
+  }
 }
 
 document.getElementById('run').onclick=async()=>{
@@ -52,6 +61,34 @@ document.getElementById('run').onclick=async()=>{
     }
   }catch(e){alert(e.message)}
 };
+
+
+async function approveAndResume(){
+  try{
+    if(!caseState || !caseId) throw new Error('No active case to approve.');
+    if(caseState.status!=='WAITING_APPROVAL') throw new Error('Case is not waiting for approval.');
+    if(isLocalMcp){
+      const res=await fetch('/approve',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          session_id:sessionId,
+          case_id:caseId,
+          fingerprint:caseState.action_fingerprint
+        })
+      });
+      const body=await res.json();
+      if(!res.ok || !body.approved) throw new Error(body.error || ('HTTP '+res.status));
+      const resumed=await rpc('tools/call',{name:'resume_case',arguments:{case_id:caseId}});
+      show(resumed.structuredContent);
+    }else{
+      const approved=await publicAgent({action:'approve',case:caseState,fingerprint:caseState.action_fingerprint});
+      const resumed=await publicAgent({action:'resume',case:approved});
+      show(resumed);
+    }
+  }catch(e){alert(e.message)}
+}
+document.getElementById('approve').onclick=approveAndResume;
 
 async function record(v){
   try{

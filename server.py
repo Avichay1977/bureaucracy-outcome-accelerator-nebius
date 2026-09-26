@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import re
 import secrets
+from datetime import datetime, timedelta, timezone
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 from nebius_client import reason_with_nebius
@@ -42,6 +44,16 @@ TOOLS = [
         }
     },
     {
+        "name": "resume_case",
+        "description": "Resume a case only after a valid external human approval has been recorded.",
+        "inputSchema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"case_id": {"type": "string"}},
+            "required": ["case_id"]
+        }
+    },
+    {
         "name": "case_status",
         "description": "Return the current compact state for a case.",
         "inputSchema": {
@@ -56,6 +68,27 @@ TOOLS = [
 def compact_case_id(goal: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", goal.lower()).strip("-")[:28]
     return slug or secrets.token_hex(4)
+
+def action_fingerprint(case_id: str, action: str, resume_point: str, gate_id: str) -> str:
+    payload = f"{case_id}|{gate_id}|{resume_point}|{action}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+def approval_is_current(case):
+    approval = case.get("approval")
+    if not approval or case.get("gate_state") != "APPROVED_TO_EXECUTE":
+        return False
+    expected = action_fingerprint(
+        case["case_id"], case["pending_action"], case["resume_point"], case["gate_id"]
+    )
+    if not secrets.compare_digest(str(approval.get("fingerprint", "")), expected):
+        return False
+    if approval.get("gate_id") != case.get("gate_id"):
+        return False
+    try:
+        expires_at = datetime.fromisoformat(approval["expires_at"])
+    except Exception:
+        return False
+    return datetime.now(timezone.utc) < expires_at
 
 def classify_heuristic(goal: str, facts):
     text = (goal + " " + " ".join(facts)).lower()
@@ -121,31 +154,65 @@ def call_tool(session_id, name, args):
         constraints = args.get("constraints") or []
         case_id = (args.get("case_id") or compact_case_id(goal))[:64]
         plan = classify(goal, facts, constraints)
+        gate_id = secrets.token_urlsafe(10)
+        resume_point = "EXECUTE_NEXT_ACTION"
+        pending_action = plan["next_action"]
         case = {
             "case_id": case_id,
             "goal": goal,
             "known_facts": facts,
             "constraints": constraints,
-            "status": "ACTION_NOW",
+            "status": "WAITING_APPROVAL",
             **plan,
+            "pending_action": pending_action,
+            "resume_point": resume_point,
+            "gate_id": gate_id,
+            "action_fingerprint": action_fingerprint(case_id, pending_action, resume_point, gate_id),
+            "gate_state": "WAITING_APPROVAL",
+            "approval": None,
             "last_outcome": None,
             "verified": False
         }
         session["cases"][case_id] = case
+        return case
+    if name == "resume_case":
+        cid = args.get("case_id")
+        if cid not in session["cases"]:
+            raise ValueError("unknown case_id")
+        case = session["cases"][cid]
+        if not approval_is_current(case):
+            case["approval"] = None
+            case["gate_state"] = "WAITING_APPROVAL"
+            case["status"] = "WAITING_APPROVAL"
+            raise ValueError("valid external human approval required before resume")
+        case["gate_state"] = "CONSUMED"
+        case["status"] = "AWAITING_VERIFICATION"
+        case["next_action"] = case["pending_action"]
         return case
     if name == "record_outcome":
         cid = args.get("case_id")
         if cid not in session["cases"]:
             raise ValueError("unknown case_id")
         case = session["cases"][cid]
+        if case.get("status") != "AWAITING_VERIFICATION":
+            raise ValueError("case is not awaiting verification; approval and resume are required")
         case["last_outcome"] = args.get("outcome", "")
         case["verified"] = bool(args.get("verified"))
         if case["verified"]:
             case["status"] = "VERIFIED_OUTCOME"
+            case["gate_state"] = "COMPLETED"
             case["next_action"] = "No further action. Preserve the proof of outcome."
         else:
-            case["status"] = "REROUTE"
+            case["pending_action"] = case["fallback"]
             case["next_action"] = case["fallback"]
+            case["resume_point"] = "EXECUTE_FALLBACK"
+            case["gate_id"] = secrets.token_urlsafe(10)
+            case["action_fingerprint"] = action_fingerprint(
+                case["case_id"], case["pending_action"], case["resume_point"], case["gate_id"]
+            )
+            case["approval"] = None
+            case["gate_state"] = "WAITING_APPROVAL"
+            case["status"] = "WAITING_APPROVAL"
         return case
     if name == "case_status":
         cid = args.get("case_id")
@@ -225,6 +292,46 @@ class Handler(BaseHTTPRequestHandler):
         return self._send_json(404, {"closed": False, "error": "unknown session"})
 
     def do_POST(self):
+        if self.path == "/approve":
+            if not self._origin_allowed():
+                return self._send_json(403, {"error": "Origin not allowed"})
+            ctype = self.headers.get("Content-Type", "")
+            if "application/json" not in ctype:
+                return self._send_json(415, {"error": "Content-Type must be application/json"})
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                data = json.loads(self.rfile.read(length).decode("utf-8"))
+            except Exception:
+                return self._send_json(400, {"error": "invalid JSON"})
+            sid = str(data.get("session_id", ""))
+            cid = str(data.get("case_id", ""))
+            supplied_fp = str(data.get("fingerprint", ""))
+            if sid not in SESSIONS or cid not in SESSIONS[sid]["cases"]:
+                return self._send_json(404, {"approved": False, "error": "unknown case"})
+            case = SESSIONS[sid]["cases"][cid]
+            if case.get("gate_state") != "WAITING_APPROVAL":
+                return self._send_json(409, {"approved": False, "error": "case is not waiting for approval"})
+            expected_fp = action_fingerprint(
+                cid, case["pending_action"], case["resume_point"], case["gate_id"]
+            )
+            if not secrets.compare_digest(supplied_fp, expected_fp):
+                return self._send_json(409, {"approved": False, "error": "approval fingerprint mismatch"})
+            now = datetime.now(timezone.utc)
+            approval = {
+                "gate_id": case["gate_id"],
+                "action": case["pending_action"],
+                "scope": {"case_id": cid, "resume_point": case["resume_point"]},
+                "source": "approval_button",
+                "fingerprint": expected_fp,
+                "approved_at": now.isoformat(),
+                "expires_at": (now + timedelta(minutes=15)).isoformat(),
+                "resume_point": case["resume_point"]
+            }
+            case["approval"] = approval
+            case["gate_state"] = "APPROVED_TO_EXECUTE"
+            case["status"] = "APPROVED_TO_EXECUTE"
+            return self._send_json(200, {"approved": True, "case_id": cid, "gate": approval})
+
         if self.path != "/mcp": return self.send_error(404)
         if not self._origin_allowed():
             return self._send_json(403, {"error": "Origin not allowed"})

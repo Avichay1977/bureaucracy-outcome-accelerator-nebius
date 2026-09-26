@@ -100,6 +100,12 @@ function newCaseId(goal: string) {
   return slug || crypto.randomUUID().slice(0, 12);
 }
 
+async function actionFingerprint(caseId: string, action: string, resumePoint: string, gateId: string) {
+  const payload = new TextEncoder().encode(`${caseId}|${gateId}|${resumePoint}|${action}`);
+  const digest = await crypto.subtle.digest("SHA-256", payload);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 export default async (req: Request) => {
   if (req.method === "GET") {
     return Response.json({
@@ -118,15 +124,80 @@ export default async (req: Request) => {
       const facts = Array.isArray(body.known_facts) ? body.known_facts.map(String) : [];
       const constraints = Array.isArray(body.constraints) ? body.constraints.map(String) : [];
       const plan = await reason(goal, facts, constraints);
+      const caseId = newCaseId(goal);
+      const gateId = crypto.randomUUID();
+      const resumePoint = "EXECUTE_NEXT_ACTION";
+      const pendingAction = plan.next_action;
       return Response.json({
-        case_id: newCaseId(goal),
+        case_id: caseId,
         goal,
         known_facts: facts,
         constraints,
-        status: "ACTION_NOW",
+        status: "WAITING_APPROVAL",
         ...plan,
+        pending_action: pendingAction,
+        resume_point: resumePoint,
+        gate_id: gateId,
+        action_fingerprint: await actionFingerprint(caseId, pendingAction, resumePoint, gateId),
+        gate_state: "WAITING_APPROVAL",
+        approval: null,
         last_outcome: null,
         verified: false
+      });
+    }
+
+    if (body.action === "approve") {
+      const current = body.case;
+      if (!current || typeof current !== "object" || !current.case_id) {
+        return Response.json({ error: "case is required" }, { status: 400 });
+      }
+      if (current.status !== "WAITING_APPROVAL" || current.gate_state !== "WAITING_APPROVAL") {
+        return Response.json({ error: "case is not waiting for approval" }, { status: 409 });
+      }
+      const expected = await actionFingerprint(current.case_id, current.pending_action, current.resume_point, current.gate_id);
+      if (String(body.fingerprint || "") !== expected) {
+        return Response.json({ error: "approval fingerprint mismatch" }, { status: 409 });
+      }
+      const now = new Date();
+      return Response.json({
+        ...current,
+        status: "APPROVED_TO_EXECUTE",
+        gate_state: "APPROVED_TO_EXECUTE",
+        approval: {
+          gate_id: current.gate_id,
+          action: current.pending_action,
+          scope: { case_id: current.case_id, resume_point: current.resume_point },
+          source: "approval_button",
+          fingerprint: expected,
+          approved_at: now.toISOString(),
+          expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
+          resume_point: current.resume_point
+        }
+      });
+    }
+
+    if (body.action === "resume") {
+      const current = body.case;
+      if (!current || typeof current !== "object" || !current.case_id) {
+        return Response.json({ error: "case is required" }, { status: 400 });
+      }
+      const approval = current.approval;
+      const expected = await actionFingerprint(current.case_id, current.pending_action, current.resume_point, current.gate_id);
+      const valid = current.status === "APPROVED_TO_EXECUTE" &&
+        current.gate_state === "APPROVED_TO_EXECUTE" &&
+        approval &&
+        approval.source === "approval_button" &&
+        approval.gate_id === current.gate_id &&
+        approval.fingerprint === expected &&
+        Date.parse(approval.expires_at || "") > Date.now();
+      if (!valid) {
+        return Response.json({ error: "valid external human approval required before resume" }, { status: 409 });
+      }
+      return Response.json({
+        ...current,
+        status: "AWAITING_VERIFICATION",
+        gate_state: "CONSUMED",
+        next_action: current.pending_action
       });
     }
 
@@ -135,14 +206,27 @@ export default async (req: Request) => {
       if (!current || typeof current !== "object" || !current.case_id) {
         return Response.json({ error: "case is required" }, { status: 400 });
       }
+      if (current.status !== "AWAITING_VERIFICATION") {
+        return Response.json({ error: "case is not awaiting verification; approval and resume are required" }, { status: 409 });
+      }
       const verified = Boolean(body.verified);
       const next = { ...current, last_outcome: String(body.outcome || ""), verified };
       if (verified) {
         next.status = "VERIFIED_OUTCOME";
+        next.gate_state = "COMPLETED";
         next.next_action = "No further action. Preserve the proof of outcome.";
       } else {
-        next.status = "REROUTE";
-        next.next_action = current.fallback;
+        const gateId = crypto.randomUUID();
+        const resumePoint = "EXECUTE_FALLBACK";
+        const pendingAction = current.fallback;
+        next.status = "WAITING_APPROVAL";
+        next.gate_state = "WAITING_APPROVAL";
+        next.pending_action = pendingAction;
+        next.next_action = pendingAction;
+        next.resume_point = resumePoint;
+        next.gate_id = gateId;
+        next.action_fingerprint = await actionFingerprint(current.case_id, pendingAction, resumePoint, gateId);
+        next.approval = null;
       }
       return Response.json(next);
     }
